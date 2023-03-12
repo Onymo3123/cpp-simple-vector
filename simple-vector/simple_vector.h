@@ -147,13 +147,11 @@ public:
     }
     
     SimpleVector(const SimpleVector& other): 
+        array_(other.capacity_),
         size_(other.size_),
         capacity_(other.capacity_)
-        {
-        ArrayPtr<Type> array{ other.capacity_};
-        std::copy(other.begin(), other.end(), Iterator{array.Get()});
-        array_.swap(array);
-    }
+        { 
+        std::copy(other.begin(), other.end(), Iterator{array_.Get()}); }
 
     SimpleVector(SimpleVector&& other) {
         swap(other);
@@ -186,47 +184,41 @@ public:
     }
 
     void PushBack(const Type& item) {
-        if(!capacity_){
-            Reserve(1);
-            array_[0]=item;
-        return ;
-        }
-        
-        if(size_ < capacity_){
-            array_[size_]=item;
-            size_++;
-        }else{
-            Reserve(2*capacity_);
-            array_[size_]=item;
-            size_++;
-        }
+        if(size_ >= capacity_) {
+            capacity_ = std::max(size_t(1), capacity_*2);
+            Reserve(2*capacity_);}
+        array_[size_]=item;
+        size_++;
     }
 
     void PushBack(Type&& item) {
-        if(size_ < capacity_){
-            array_[size_] = std::move(item);
-            size_++;
-        }else{
-            
-            capacity_ = std::max((size_t)1, capacity_*2);
-            SimpleVector<Type> array_new (capacity_);
-            std::move(begin(), end(), array_new.begin());
-            array_.swap(array_new.array_);
-            array_[size_]=std::move(item);
-            size_++;
-        }
+        if(size_ >= capacity_){
+            capacity_ = std::max(size_t(1), capacity_*2);
+            Reserve(2*capacity_);}
+        array_[size_]=std::move(item);
+        size_++;
     }
+
+    Iterator create_insert_pos(ConstIterator pos){
+        auto dist_ = std::distance(cbegin(), pos);
+        ArrayPtr<Type> array(capacity_);
+        std::move_backward(Iterator(begin()+dist_), end(),Iterator{array.Get()+size_+1});
+        std::move(begin(),Iterator(begin()+dist_),array.Get());
+        array_.swap(array);
+        
+        return Iterator(begin()+dist_);
+    }
+
 
     Iterator Insert(ConstIterator pos, const Type& value) {
         auto dist_ = std::distance(cbegin(), pos);
         if(size_ == capacity_){
-            ArrayPtr<Type> array(2*capacity_);
-            std::move_backward(pos,cend(),Iterator{array.Get()+size_+1});
-            array[dist_]=move(value);
+            capacity_ = std::max(size_t(1), capacity_*2);
             assert(pos>=cbegin()&&pos<=cend());
-            std::move(cbegin(),pos,array.begin());
-            array_.swap(array);
+            auto po = create_insert_pos(pos);
+            *po = std::move(value);
             size_++;
+            return po;
         }else{
             size_++;
             std::move_backward(pos,ConstIterator{end()-1},end());
@@ -235,28 +227,14 @@ public:
         return Iterator{begin()+dist_}; // Напишите тело самостоятельно
     }
     
-    Iterator create(size_t size){
-        SimpleVector<Type> array_new(1);
-        return array_new.begin();
-    }
-    
     Iterator Insert(ConstIterator pos, Type&& value) {
-        if(!capacity_){
-            SimpleVector<Type> array_new(1);
-            swap(array_new);
-            array_[0]=std::move(value);
-            return begin();
-        }
         auto dist_ = std::distance(cbegin(), pos);
         if(size_ == capacity_){
-            ArrayPtr<Type> array(2*capacity_);
-            std::move_backward(Iterator(pos), end(),Iterator{array_.Get()+size_+1});
-            array[dist_]=std::move(value);
-            assert(pos>=cbegin()&&pos<=cend());
-            std::move(begin(),Iterator(pos),array.Get());
-            capacity_ = 2*capacity_;
-            array_.swap(array);
+            capacity_ = std::max(size_t(1), capacity_*2);
+            auto po = create_insert_pos(pos);
+            *po = std::move(value);
             size_++;
+            return po;
         }else{
             size_++;
             std::move_backward(Iterator(pos),Iterator{end()-1},end());
@@ -271,7 +249,7 @@ public:
     }
 
     Iterator Erase(ConstIterator pos) {
-        assert(pos>=cbegin()&&pos<=cend());
+        assert(pos>=cbegin()&&pos<cend());
         auto dist_ = std::distance(cbegin(), pos);
         std::move(Iterator(pos+1),end(),Iterator(pos));
         size_--;
@@ -308,15 +286,15 @@ inline bool operator<(const SimpleVector<Type>& lhs, const SimpleVector<Type>& r
 
 template <typename Type>
 inline bool operator<=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
-    return (lhs<rhs)||(lhs==rhs);
+    return !(lhs>rhs);
 }
 
 template <typename Type>
 inline bool operator>(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
-    return !(lhs<=rhs);
+    return rhs < lhs;
 }
 
 template <typename Type>
 inline bool operator>=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
-    return (lhs>rhs)||(lhs==rhs);
+    return !(lhs<rhs);
 } 
