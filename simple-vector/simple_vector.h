@@ -199,48 +199,34 @@ public:
         size_++;
     }
 
-    Iterator create_insert_pos(ConstIterator pos){
+   Iterator create_insert_pos(ConstIterator pos){
         auto dist_ = std::distance(cbegin(), pos);
-        ArrayPtr<Type> array(capacity_);
-        std::move_backward(Iterator(begin()+dist_), end(),Iterator{array.Get()+size_+1});
-        std::move(begin(),Iterator(begin()+dist_),array.Get());
-        array_.swap(array);
-        
+        assert(pos>=cbegin()&&pos<=cend());
+        if(size_ == capacity_){
+            capacity_ = std::max(size_t(1), capacity_*2);
+            ArrayPtr<Type> array(capacity_);
+            std::move_backward(Iterator(begin()+dist_), end(),Iterator{array.Get()+size_+1});
+            std::move(begin(), Iterator(begin()+dist_), array.Get());
+            array_.swap(array);
+            size_++;
+        }else{
+            size_++;
+            std::move_backward(Iterator(pos),Iterator{end()},end());
+        }
         return Iterator(begin()+dist_);
     }
 
 
     Iterator Insert(ConstIterator pos, const Type& value) {
-        auto dist_ = std::distance(cbegin(), pos);
-        if(size_ == capacity_){
-            capacity_ = std::max(size_t(1), capacity_*2);
-            assert(pos>=cbegin()&&pos<=cend());
-            auto po = create_insert_pos(pos);
-            *po = std::move(value);
-            size_++;
-            return po;
-        }else{
-            size_++;
-            std::move_backward(pos,ConstIterator{end()-1},end());
-            array_[dist_]=value;
-        }
-        return Iterator{begin()+dist_}; // Напишите тело самостоятельно
+            auto newpos = create_insert_pos(pos);
+            *newpos = value;
+            return newpos;
     }
     
     Iterator Insert(ConstIterator pos, Type&& value) {
-        auto dist_ = std::distance(cbegin(), pos);
-        if(size_ == capacity_){
-            capacity_ = std::max(size_t(1), capacity_*2);
-            auto po = create_insert_pos(pos);
-            *po = std::move(value);
-            size_++;
-            return po;
-        }else{
-            size_++;
-            std::move_backward(Iterator(pos),Iterator{end()-1},end());
-            array_[dist_]=std::move(value);
-        }
-        return Iterator{begin()+dist_}; // Напишите тело самостоятельно
+            auto newpos = create_insert_pos(pos);
+            *newpos = std::move(value);
+            return newpos;
     }
 
     void PopBack() noexcept {
